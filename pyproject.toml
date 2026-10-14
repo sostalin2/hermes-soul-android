@@ -1,6 +1,6 @@
 [project]
 name = "hermes-soul-android"
-version = "1.0.0"
+version = "1.0.1"
 description = "Hermes Soul - Lightweight Android GUI Agent with OpenRouter"
 authors = [{name = "Soul"}]
 requires-python = ">=3.10"

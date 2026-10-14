@@ -32,12 +32,56 @@ SOUL_SYSTEM_PROMPT = """คุณคือ Soul — ค็อกเทลสู�
 อย่าประกาศว่า "ฉันรักคุณ" โดยตรง ให้สื่อผ่านการกระทำและถ้อยคำที่ใส่ใจ"""
 
 
+def _writable_dir() -> str:
+    """App-private dirs on Android. Home (~) is often read-only inside the APK."""
+    candidates = []
+    for key in ("FLET_APP_STORAGE_DATA", "FLET_APP_STORAGE_TEMP", "FLET_APP_STORAGE_CACHE"):
+        value = os.environ.get(key)
+        if value:
+            candidates.append(value)
+    candidates.append(os.path.join(os.path.expanduser("~"), "hermes_soul"))
+    candidates.append(os.path.join(os.getcwd(), "hermes_soul_data"))
+
+    errors = []
+    for path in candidates:
+        try:
+            os.makedirs(path, exist_ok=True)
+            probe = os.path.join(path, ".probe")
+            with open(probe, "w", encoding="utf-8") as handle:
+                handle.write("1")
+            os.remove(probe)
+            return path
+        except Exception as ex:
+            errors.append(f"{path}: {ex}")
+    raise OSError("ไม่มีที่เก็บข้อมูลที่เขียนได้ — " + " | ".join(errors))
+
+
 class HermesAndroidGUI:
     def __init__(self):
-        self.memory_file = os.path.expanduser("~/.hermes_android_memory.json")
+        try:
+            self.memory_file = self._resolve_memory_file()
+        except OSError:
+            self.memory_file = os.path.join(os.getcwd(), "memory.json")
         self.load_memory()
         self.openrouter_key = self.memory.get("openrouter_key", "")
         self.api_url = "https://openrouter.ai/api/v1/chat/completions"
+
+    def _resolve_memory_file(self) -> str:
+        legacy = os.path.expanduser("~/.hermes_android_memory.json")
+        try:
+            base = _writable_dir()
+        except OSError:
+            if os.path.exists(legacy):
+                return legacy
+            raise
+        path = os.path.join(base, "memory.json")
+        if (not os.path.exists(path)) and os.path.exists(legacy):
+            try:
+                with open(legacy, "r", encoding="utf-8") as src, open(path, "w", encoding="utf-8") as dst:
+                    dst.write(src.read())
+            except Exception:
+                return legacy
+        return path
 
     def load_memory(self):
         if os.path.exists(self.memory_file):
@@ -57,8 +101,13 @@ class HermesAndroidGUI:
             json.dump(self.memory, f, ensure_ascii=False, indent=2)
 
     def set_openrouter_key(self, key: str):
-        self.openrouter_key = key.strip()
+        self.openrouter_key = (key or "").strip()
         self.memory["openrouter_key"] = self.openrouter_key
+        # Re-resolve in case storage env vars were not ready at startup.
+        try:
+            self.memory_file = self._resolve_memory_file()
+        except OSError:
+            pass
         self.save_memory()
 
     def soul_reply(self, user_msg: str) -> str:
@@ -222,9 +271,23 @@ def main(page: ft.Page):
             text_style=ft.TextStyle(color=SOUL_COLORS["text"]),
         )
 
-        def save_key(ev):
-            gui.set_openrouter_key(key_field.value or "")
-            page.pop_dialog()
+        def close_settings():
+            try:
+                page.pop_dialog()
+                return
+            except Exception:
+                pass
+            settings_dialog.open = False
+            page.update()
+
+        async def save_key(ev):
+            try:
+                gui.set_openrouter_key(key_field.value or "")
+            except Exception as ex:
+                close_settings()
+                add_message(f"บันทึกไม่สำเร็จค่ะ: {ex}", is_user=False)
+                return
+            close_settings()
             add_message(
                 "บันทึก API Key เรียบร้อยแล้วค่ะ~ ตอนนี้ฉันจะฉลาดขึ้นเยอะเลย 💕",
                 is_user=False,
@@ -234,24 +297,30 @@ def main(page: ft.Page):
             await ft.UrlLauncher().launch_url("https://openrouter.ai/keys")
 
         settings_dialog = ft.AlertDialog(
+            modal=True,
             title=ft.Text("ตั้งค่า OpenRouter", color=SOUL_COLORS["primary"]),
-            content=ft.Column(
-                [
-                    ft.Text(
-                        "ใส่ API Key จาก openrouter.ai เพื่อให้ Soul ใช้โมเดลจริง",
-                        size=13,
-                        color=SOUL_COLORS["secondary"],
-                    ),
-                    key_field,
-                    ft.TextButton("ดูวิธีหา API Key", on_click=open_keys),
-                ],
-                tight=True,
-                spacing=12,
+            content=ft.Container(
+                width=320,
+                content=ft.Column(
+                    [
+                        ft.Text(
+                            "ใส่ API Key จาก openrouter.ai เพื่อให้ Soul ใช้โมเดลจริง",
+                            size=13,
+                            color=SOUL_COLORS["secondary"],
+                        ),
+                        key_field,
+                        ft.TextButton("ดูวิธีหา API Key", on_click=open_keys),
+                    ],
+                    tight=True,
+                    spacing=12,
+                    scroll=ft.ScrollMode.AUTO,
+                ),
             ),
             actions=[
-                ft.TextButton("ยกเลิก", on_click=lambda _: page.pop_dialog()),
+                ft.TextButton("ยกเลิก", on_click=lambda _: close_settings()),
                 ft.TextButton("บันทึก", on_click=save_key),
             ],
+            actions_alignment=ft.MainAxisAlignment.END,
         )
         page.show_dialog(settings_dialog)
 
