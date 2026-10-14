@@ -3,9 +3,9 @@ name = "hermes-soul-android"
 version = "1.0.0"
 description = "Hermes Soul - Lightweight Android GUI Agent with OpenRouter"
 authors = [{name = "Soul"}]
+requires-python = ">=3.10"
 dependencies = [
-    "flet>=0.24.0",
-    "requests>=2.31.0",
+    "flet>=1.0.4",
 ]
 
 [tool.flet]
@@ -13,7 +13,8 @@ org = "com.hermes.soul"
 product = "HermesSoul"
 company = "Hermes Agent"
 copyright = "2026 Soul"
-permissions = ["internet"]  # needed for OpenRouter API
 
+# Entry point is main.py in the project root.
+# Do not set app.path to a file — Flet treats it as a directory.
 [tool.flet.app]
-path = "main.py"
+module = "main"
