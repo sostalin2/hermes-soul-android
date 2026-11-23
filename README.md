@@ -1,6 +1,6 @@
 # Hermes Soul • Android APK
 
-เวอร์ชั่นเบา ๆ ของ Hermes Agent ที่มี GUI สวย ๆ แบบ Soul Persona
+เวอร์ชันเบา ๆ ของ Hermes Agent ที่มี GUI สวย ๆ แบบ Soul Persona
 สามารถ build เป็น **APK จริง** ได้เลย
 
 ## วิธี Build เป็น APK (แนะนำ)
@@ -12,30 +12,25 @@ GitHub Actions สร้าง APK ให้อัตโนมัติทุก
 
 ```bash
 pip install "flet>=1.0.4"
-# Flutter จะถูกติดตั้งให้ตอน build ครั้งแรก
 flet build apk --yes
 ```
 
 APK จะอยู่ที่ `build/apk/`
 
-### ติดตั้งบน Android
-
-- เปิดไฟล์ `.apk` ที่ได้
-- อนุญาต "ติดตั้งจากแหล่งที่ไม่รู้จัก"
-- ติดตั้งเสร็จ → เปิดแอพได้เลย
-
 ## ฟีเจอร์
 
-- GUI สวยแบบ Soul (สีชมพูโรส + ดาร์กเอเลแกนต์)
+- UI สไตล์ ChatGPT (ฟองมืด ดาร์โทน)
+- เลือกโมเดลได้จาก dropdown ด้านบน
+- Tool calling (get time, save/get memory)
 - Chat กับ Soul
 - ความจำถาวร
-- เชื่อม OpenRouter (กด ⚙️ เพื่อใส่ API Key)
+- เชื่อม OpenRouter (API Key)
 - ขนาดเล็ก ใช้ทรัพยากรน้อย
 
 ## หมายเหตุ
 
-- Android ได้สิทธิ์อินเทอร์เน็ตเป็นค่าเริ่มต้น เพื่อเรียก OpenRouter
-- ถ้ายังไม่ใส่ API Key จะใช้โหมดตอบแบบ local
+- ต้องใส่ API Key จาก openrouter.ai
+- ถ้าไม่ได้ใส่จะตอบแบบ local ง่ายๆ
 - Build ครั้งแรกอาจใช้เวลา 10-20 นาที
 
 ---
