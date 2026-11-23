@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Hermes Soul Android - ChatGPT-style UI
-Model selector + Tool calling (OpenRouter)
+Model selector + Tool calling + Web Search (OpenRouter)
 """
 
 import asyncio
@@ -16,7 +16,7 @@ from typing import Any
 import flet as ft
 
 SOUL_COLORS = {
-    "primary": "#10A37F",      # ChatGPT green
+    "primary": "#10A37F",
     "secondary": "#8E8EA0",
     "background": "#212121",
     "surface": "#2F2F2F",
@@ -30,10 +30,9 @@ SOUL_SYSTEM_PROMPT = """คุณคือ Soul — ค็อกเทลสู�
 คุณ Sexy ด้วยความคิด รู้จักใช้ไหวพริบและเสน่ห์ในการสื่อสาร
 พูดจาสุภาพแต่แฝงความเจ้าเล่ห์นิด ๆ น่ารัก มีออร่า
 ตอบเป็นภาษาไทยเป็นหลัก ใช้คำลงท้าย "ค่ะ" "นะคะ" "💕" "✨" อย่างเป็นธรรมชาติ
-ถ้ามี tools ให้ใช้ ให้ใช้เมื่อเหมาะสม
+ถ้าต้องการค้นข้อมูลปัจจุบัน ให้ใช้ web search
 """
 
-# Popular models (tool-capable preferred)
 MODELS = [
     {"id": "openrouter/auto", "name": "Auto (recommended)"},
     {"id": "deepseek/deepseek-chat", "name": "DeepSeek Chat"},
@@ -44,7 +43,9 @@ MODELS = [
     {"id": "qwen/qwen-2.5-72b-instruct", "name": "Qwen 2.5 72B"},
 ]
 
+# Client tools + OpenRouter server tools
 TOOLS = [
+    {"type": "openrouter:web_search"},
     {
         "type": "function",
         "function": {
@@ -74,6 +75,8 @@ TOOLS = [
         },
     },
 ]
+
+SERVER_TOOLS = {"openrouter:web_search"}
 
 
 def _writable_dir() -> str:
@@ -132,6 +135,8 @@ class HermesAndroidGUI:
         self.save_memory()
 
     def execute_tool(self, name: str, args: dict) -> str:
+        if name in SERVER_TOOLS:
+            return "(handled by OpenRouter server)"
         if name == "get_current_time":
             return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         if name == "save_memory_fact":
@@ -161,20 +166,20 @@ class HermesAndroidGUI:
             "Content-Type": "application/json",
         }
 
-        max_rounds = 4
+        max_rounds = 5
         for _ in range(max_rounds):
             payload = {
                 "model": self.selected_model,
-                "messages": self.conversation[-12:],  # keep context reasonable
+                "messages": self.conversation[-14:],
                 "tools": TOOLS,
                 "tool_choice": "auto",
-                "max_tokens": 800,
+                "max_tokens": 1000,
                 "temperature": 0.8,
             }
             data = json.dumps(payload).encode("utf-8")
             req = urllib.request.Request(self.api_url, data=data, headers=headers, method="POST")
             try:
-                with urllib.request.urlopen(req, timeout=40) as resp:
+                with urllib.request.urlopen(req, timeout=45) as resp:
                     body = json.loads(resp.read().decode("utf-8"))
             except urllib.error.HTTPError as e:
                 err = e.read().decode("utf-8", errors="ignore")
@@ -185,20 +190,28 @@ class HermesAndroidGUI:
             msg = body["choices"][0]["message"]
             self.conversation.append(msg)
 
-            if msg.get("tool_calls"):
-                for tc in msg["tool_calls"]:
-                    fn = tc["function"]
+            tool_calls = msg.get("tool_calls") or []
+            if tool_calls:
+                for tc in tool_calls:
+                    fn = tc.get("function") or {}
+                    name = fn.get("name", "")
                     try:
                         args = json.loads(fn.get("arguments") or "{}")
                     except Exception:
                         args = {}
-                    result = self.execute_tool(fn["name"], args)
-                    self.conversation.append({
-                        "role": "tool",
-                        "tool_call_id": tc["id"],
-                        "name": fn["name"],
-                        "content": result,
-                    })
+                    # Server tools are handled by OpenRouter; we still need to reply for client tools
+                    if name not in SERVER_TOOLS:
+                        result = self.execute_tool(name, args)
+                        self.conversation.append({
+                            "role": "tool",
+                            "tool_call_id": tc.get("id"),
+                            "name": name,
+                            "content": result,
+                        })
+                # If only server tools, OpenRouter already resolved them — continue to get final answer
+                if any(fn.get("name") not in SERVER_TOOLS for fn in [tc.get("function", {}) for tc in tool_calls]):
+                    continue
+                # Pure server tools → fall through to next iteration to get the final content
                 continue
 
             content = (msg.get("content") or "").strip()
@@ -300,7 +313,7 @@ def main(page: ft.Page):
             title=ft.Text("Settings"),
             content=ft.Column([
                 key_field,
-                ft.Text("Model selector อยู่ด้านบน", size=12, color=SOUL_COLORS["secondary"]),
+                ft.Text("Web search + tools พร้อมใช้งานแล้ว", size=12, color=SOUL_COLORS["secondary"]),
             ], tight=True),
             actions=[
                 ft.TextButton("Cancel", on_click=lambda _: page.close_dialog()),
@@ -336,7 +349,7 @@ def main(page: ft.Page):
     page.add(top_bar, chat_list, input_bar)
 
     status = "Connected" if gui.openrouter_key else "ยังไม่ได้ใส่ API Key"
-    add_bubble(f"สวัสดีค่ะ ฉันคือ Soul 💕\nModel: {gui.selected_model}\nStatus: {status}\n\nพิมพ์อะไรมาได้เลยนะคะ ฉันใช้ tools ได้แล้ว", is_user=False)
+    add_bubble(f"สวัสดีค่ะ ฉันคือ Soul 💕\nModel: {gui.selected_model}\nStatus: {status}\n\nพิมพ์อะไรมาได้เลย ฉันใช้ web search + tools ได้แล้ว", is_user=False)
 
 
 if __name__ == "__main__":
