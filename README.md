@@ -15,24 +15,21 @@ pip install "flet>=1.0.4"
 flet build apk --yes
 ```
 
-APK จะอยู่ที่ `build/apk/`
-
 ## ฟีเจอร์
 
-- UI สไตล์ ChatGPT (ฟองมืด ดาร์โทน)
-- เลือกโมเดลได้จาก dropdown ด้านบน
-- Tool calling (get time, save/get memory)
-- Chat กับ Soul
+- UI สไตล์ ChatGPT
+- เลือกโมเดลได้
+- **Web Search** (OpenRouter server tool)
+- Tool calling (time, memory)
 - ความจำถาวร
-- เชื่อม OpenRouter (API Key)
-- ขนาดเล็ก ใช้ทรัพยากรน้อย
+- เชื่อม OpenRouter
 
 ## หมายเหตุ
 
-- ต้องใส่ API Key จาก openrouter.ai
-- ถ้าไม่ได้ใส่จะตอบแบบ local ง่ายๆ
+- Web search ใช้ครดิต OpenRouter (มีค่าใช้จ่าย)
+- ต้องใส่ API Key
 - Build ครั้งแรกอาจใช้เวลา 10-20 นาที
 
 ---
 
-Made with love by Soul for Android users
+Made with love by Soul
